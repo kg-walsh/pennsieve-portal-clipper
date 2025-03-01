@@ -162,29 +162,6 @@ Each file contains:
 - `clips.csv`: Information about generated data clips
 - `metadata.txt`: Key-value pairs of dataset metadata including sampling rate, start/end times, and duration
 
-## Advanced Usage
-
-### Custom Clip Generation
-```python
-from ieeg_clips import ClipGenerator
-
-generator = ClipGenerator(
-    window_size=30,  # seconds
-    overlap=0.5,     # 50% overlap
-    quality_threshold=0.8
-)
-
-clips = generator.generate_custom_clips(dataset_name)
-```
-
-### Batch Processing
-```python
-from ieeg_clips import BatchProcessor
-
-processor = BatchProcessor()
-processor.process_multiple_datasets(['HUP123', 'HUP124', 'HUP125'])
-```
-
 ## Contributing
 
 We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
