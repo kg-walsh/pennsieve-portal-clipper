@@ -50,19 +50,6 @@ SHEET_NAME_MANUAL_VALIDATION_START_TIME=your_sheet_name
 SHEET_NAME_MANUAL_VALIDATION_SEIZURE_TIME=your_sheet_name
 ```
 
-## Quick Start
-
-```python
-from ieeg_clips import IEEGDatasetProcessor
-
-# Initialize processor
-processor = IEEGDatasetProcessor()
-
-# Process a dataset
-dataset_name = "HUP123_phaseII"
-clips = processor.process_dataset(dataset_name)
-```
-
 ## Module Documentation
 
 ### IEEGMetadata (`src/ieeg_metadata.py`)
