@@ -125,7 +125,7 @@ class IEEGmetadataValidated(IEEGmetadata, ManualValidation):
 
     def timestamp_clips(self, clips_df: pd.DataFrame, metadata_dict: Dict) -> pd.DataFrame:
         """
-        Index clips DataFrame with timestamps and night/day information.
+        Index clips DataFrame with timestamps and night/day information at 1-minute intervals.
         
         Args:
             clips_df (pd.DataFrame): DataFrame containing clips data
@@ -137,11 +137,12 @@ class IEEGmetadataValidated(IEEGmetadata, ManualValidation):
         
         # Convert actual_start_time string to datetime
         actual_start_time = pd.to_datetime(metadata_dict['actual_start_time'])
-
+        
         # Create timestamp index
         timestamps = []
-        is_night = []  # New list to store night/day information
-        for t in clips_df.index:
+        is_night = []
+        for t in clips_df.start_time_usec:
+            t = t/1e6 # Convert to seconds
             days_elapsed = int(t // (24 * 3600))
             current_time = actual_start_time + pd.Timedelta(seconds=int(t))
             
@@ -153,8 +154,10 @@ class IEEGmetadataValidated(IEEGmetadata, ManualValidation):
             hour = current_time.hour
             is_night.append(hour >= 19 or hour < 8)
         
+        # Reindex the DataFrame to 1-minute intervals
         clips_df.index = pd.Index(timestamps, name='timestamp')
-        clips_df['is_night'] = is_night  # Add the new column
+        clips_df['is_night'] = is_night
+        
         return clips_df
     
     def save_validated_metadata(self, record_id, dataset_name, 
