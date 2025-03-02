@@ -1,6 +1,6 @@
 # IEEG Data Clipper
 
-A comprehensive Python package for extracting, processing, and validating iEEG (intracranial electroencephalography) data from IEEG.org portal. This tool streamlines the workflow for researchers working with epilepsy data by providing automated data retrieval, manual validation support, and intelligent clip generation.
+This Python package extracts, processes, and validates intracranial electroencephalography data from IEEG.org portal. This tool streamlines workflow through automated data retrieval, integrating manual annotations, epoch generation, and quality control.
 
 ## Features
 
