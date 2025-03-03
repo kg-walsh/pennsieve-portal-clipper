@@ -5,6 +5,7 @@ from ieeg_metadata_validated import IEEGmetadataValidated
 from pathlib import Path
 import h5py
 from IPython import embed
+from loguru import logger
 
 # %%
 class ClipGenerator(IEEGmetadataValidated):
@@ -20,6 +21,15 @@ class ClipGenerator(IEEGmetadataValidated):
         super().__init__()
         self.record_id = record_id
         self.data_path = data_path
+        
+        # Configure loguru logger
+        logger.add(
+            "clip_generator.log",
+            rotation="100 MB",  # Rotate file when it reaches 100MB
+            retention="1 week",  # Keep logs for 1 week
+            format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",
+            level="INFO"
+        )
 
     def find_interictal_clips(self):
         """
@@ -137,7 +147,7 @@ class ClipGenerator(IEEGmetadataValidated):
         
         # Process each day separately
         for day_num, day_clips in interictal_clips.groupby('day_num'):
-            print(f'Processing day {day_num}')
+            logger.info(f'Processing day {day_num} in {dataset} of {self.record_id}')
             # Create a separate H5 file for each day
             with h5py.File(clip_path / f'interictal_ieeg_day{day_num}.h5', 'w') as f:
                 # Use enumerate to get a counter for the clips
@@ -164,25 +174,23 @@ class ClipGenerator(IEEGmetadataValidated):
 # %%
 if __name__ == '__main__':
 
-    #   'sub-RID0031', 'sub-RID0032', 'sub-RID0033', 'sub-RID0050',
-    #   'sub-RID0051', 'sub-RID0064', 'sub-RID0089', 'sub-RID0101',
-    #   'sub-RID0117', 
+    subjects_to_find = ['sub-RID0089', 'sub-RID0117', 'sub-RID0143', 
+       'sub-RID0167', 'sub-RID0175', 'sub-RID0179', 'sub-RID0193', 
+       'sub-RID0222', 'sub-RID0238', 'sub-RID0267', 'sub-RID0301', 
+       'sub-RID0320', 'sub-RID0322', 'sub-RID0332', 'sub-RID0381', 
+       'sub-RID0405', 'sub-RID0412', 'sub-RID0424', 'sub-RID0508', 
+       'sub-RID0562', 'sub-RID0589', 'sub-RID0595', 'sub-RID0621',
+       'sub-RID0658', 'sub-RID0675', 'sub-RID0679', 'sub-RID0700',
+       'sub-RID0785', 'sub-RID0796', 'sub-RID0852', 'sub-RID0883',
+       'sub-RID0893', 'sub-RID0941', 'sub-RID0967']
 
-    # subjects_to_find = ['sub-RID0143', 'sub-RID0167', 'sub-RID0175',
-    #    'sub-RID0179', 'sub-RID0193', 'sub-RID0222', 'sub-RID0238',
-    #    'sub-RID0267', 'sub-RID0301', 'sub-RID0320', 'sub-RID0322',
-    #    'sub-RID0332', 'sub-RID0381', 'sub-RID0405', 'sub-RID0412',
-    #    'sub-RID0424', 'sub-RID0508', 'sub-RID0562', 'sub-RID0589',
-    #    'sub-RID0595', 'sub-RID0621', 'sub-RID0658', 'sub-RID0675',
-    #    'sub-RID0679', 'sub-RID0700', 'sub-RID0785', 'sub-RID0796',
-    #    'sub-RID0852', 'sub-RID0883', 'sub-RID0893', 'sub-RID0941',
-    #    'sub-RID0967']
-    
-
-    subjects_to_find = ['sub-RID0032']
     
     for subject in subjects_to_find:
-        clip_generator = ClipGenerator(record_id=subject)
-        interictal_clips = clip_generator.mark_interictal_clips()
+        try:
+            clip_generator = ClipGenerator(record_id=subject)
+            logger.info(f"Processing subject: {subject}")
+            interictal_clips = clip_generator.mark_interictal_clips()
+        except Exception as e:
+            logger.error(f"Error processing {subject}: {str(e)}")
 
 # %%
