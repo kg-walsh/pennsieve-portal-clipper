@@ -10,6 +10,9 @@ from pathlib import Path
 from IPython import embed
 #%%
 class IEEGmetadataValidated(IEEGmetadata, ManualValidation):
+    """
+    A class that inherits from both IEEGmetadata and ManualValidation.
+    """
 
     def __init__(self):
         """
