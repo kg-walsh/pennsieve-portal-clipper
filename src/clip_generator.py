@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from ieeg_metadata_validated import IEEGmetadataValidated
 from pathlib import Path
+import h5py
 from IPython import embed
 
 # %%
@@ -96,6 +97,7 @@ class ClipGenerator(IEEGmetadataValidated):
             
             # Group by day_num instead of day
             for day_num, day_clips in interictal_clips.groupby('day_num'):
+
                 # Sort by time
                 day_clips = day_clips.sort_values('time')
                 
@@ -103,46 +105,81 @@ class ClipGenerator(IEEGmetadataValidated):
                 time_diff = day_clips['time'].diff()
                 new_segment = time_diff > pd.Timedelta(minutes=1)
                 segment_id = new_segment.cumsum()
+                # find the length of segments
+                segment_lengths = day_clips.groupby(segment_id).size()
+
+                # find the longest segment and mark everything except the first 60 minutes as False
+                longest_segment = segment_lengths.idxmax()
                 
-                # For each continuous segment
-                for segment_num, segment in day_clips.groupby(segment_id):
-                    
-                    # If segment duration is <= 1 hour
-                    segment_duration = segment['time'].max() - segment['time'].min()
-                    if segment_duration <= pd.Timedelta(hours=1):
-                        # Mark these clips for extraction
-                        interictal_clips.loc[segment.index, 'mark_for_extraction'] = False
+                # Mark all segments that are not the longest segment as False
+                not_longest_segment_mask = (segment_id != longest_segment)
+                interictal_clips.loc[day_clips[not_longest_segment_mask].index, 'mark_for_extraction'] = False
+                
+                # For the longest segment, mark everything after 30 minutes as False
+                longest_segment_mask = (segment_id == longest_segment)
+                segment_indices = day_clips[longest_segment_mask].index
+                if len(segment_indices) > 30:
+                    interictal_clips.loc[segment_indices[30:], 'mark_for_extraction'] = False
             
             # Remove the final formatting line since 'timestamp' is not a datetime column
             interictal_clips = interictal_clips.drop(columns=['day_label', 'time'])
 
-            # Create a summary string with RID and save to text file
-            summary = f"Summary for {self.record_id} or {clip_path.parent.name}:\n"
-            summary += interictal_clips.groupby('day_num')['mark_for_extraction'].value_counts().to_string()
-            print(summary)
+            self._get_interictal_clips(interictal_clips, clip_path.parent)    
 
-            # Save summary to text file
-            output_path = Path(__file__).parent.parent / 'data' / 'interictal_clips' / f'{self.record_id}_{clip_path.parent.name}_summary.txt'
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(output_path, 'w') as f:
-                f.write(summary)
-
-            return interictal_clips
+        return interictal_clips
+        
+    def _get_interictal_clips(self, interictal_clips: pd.DataFrame, clip_path: Path):
+        """
+        Get the interictal clips and save them to separate H5 files for each day.
+        """
+        dataset = clip_path.name
+        interictal_clips = interictal_clips[interictal_clips['mark_for_extraction']]
+        
+        # Process each day separately
+        for day_num, day_clips in interictal_clips.groupby('day_num'):
+            print(f'Processing day {day_num}')
+            # Create a separate H5 file for each day
+            with h5py.File(clip_path / f'interictal_ieeg_day{day_num}.h5', 'w') as f:
+                # Use enumerate to get a counter for the clips
+                for clip_idx, (index, clip) in enumerate(day_clips.iterrows(), start=1):
+                    start_time_usec = clip['start_time_usec']
+                    end_time_usec = clip['end_time_usec']
+                    
+                    ieeg_clip, sampling_rate, channel_labels = self.get_dataset_clips(
+                        dataset_name=dataset, 
+                        start_time_usec=start_time_usec, 
+                        end_time_usec=end_time_usec
+                    )
+                    
+                    clip_num = f'{clip_idx:02d}'
+                    # Create dataset directly in the root of the file
+                    ieeg_dataset = f.create_dataset(f'clip{clip_num}', data=ieeg_clip)
+                    # Add attributes to the dataset
+                    ieeg_dataset.attrs['timestamp'] = clip['timestamp']
+                    ieeg_dataset.attrs['start_time_usec'] = start_time_usec
+                    ieeg_dataset.attrs['end_time_usec'] = end_time_usec
+                    ieeg_dataset.attrs['channels_labels'] = channel_labels
+                    ieeg_dataset.attrs['sampling_rate'] = sampling_rate
 
 # %%
 if __name__ == '__main__':
 
-    subjects_to_find = ['sub-RID0031', 'sub-RID0032', 'sub-RID0033', 'sub-RID0050',
-       'sub-RID0051', 'sub-RID0064', 'sub-RID0089', 'sub-RID0101',
-       'sub-RID0117', 'sub-RID0143', 'sub-RID0167', 'sub-RID0175',
-       'sub-RID0179', 'sub-RID0193', 'sub-RID0222', 'sub-RID0238',
-       'sub-RID0267', 'sub-RID0301', 'sub-RID0320', 'sub-RID0322',
-       'sub-RID0332', 'sub-RID0381', 'sub-RID0405', 'sub-RID0412',
-       'sub-RID0424', 'sub-RID0508', 'sub-RID0562', 'sub-RID0589',
-       'sub-RID0595', 'sub-RID0621', 'sub-RID0658', 'sub-RID0675',
-       'sub-RID0679', 'sub-RID0700', 'sub-RID0785', 'sub-RID0796',
-       'sub-RID0852', 'sub-RID0883', 'sub-RID0893', 'sub-RID0941',
-       'sub-RID0967']
+    #   'sub-RID0031', 'sub-RID0032', 'sub-RID0033', 'sub-RID0050',
+    #   'sub-RID0051', 'sub-RID0064', 'sub-RID0089', 'sub-RID0101',
+    #   'sub-RID0117', 
+
+    # subjects_to_find = ['sub-RID0143', 'sub-RID0167', 'sub-RID0175',
+    #    'sub-RID0179', 'sub-RID0193', 'sub-RID0222', 'sub-RID0238',
+    #    'sub-RID0267', 'sub-RID0301', 'sub-RID0320', 'sub-RID0322',
+    #    'sub-RID0332', 'sub-RID0381', 'sub-RID0405', 'sub-RID0412',
+    #    'sub-RID0424', 'sub-RID0508', 'sub-RID0562', 'sub-RID0589',
+    #    'sub-RID0595', 'sub-RID0621', 'sub-RID0658', 'sub-RID0675',
+    #    'sub-RID0679', 'sub-RID0700', 'sub-RID0785', 'sub-RID0796',
+    #    'sub-RID0852', 'sub-RID0883', 'sub-RID0893', 'sub-RID0941',
+    #    'sub-RID0967']
+    
+
+    subjects_to_find = ['sub-RID0032']
     
     for subject in subjects_to_find:
         clip_generator = ClipGenerator(record_id=subject)

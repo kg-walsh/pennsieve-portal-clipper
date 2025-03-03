@@ -6,7 +6,7 @@ import pandas as pd
 from typing import Tuple, Dict
 from redcap_data import Redcap
 from pathlib import Path
-
+from IPython import embed
 #%%
 class IEEGmetadata(Redcap):
 
@@ -190,6 +190,23 @@ class IEEGmetadata(Redcap):
                 f.write(f"{key}: {value}\n")
 
         return channels_df, annotations_df, metadata_dict, clips_df
+    
+    def get_dataset_clips(self, dataset_name: str, start_time_usec: int, end_time_usec: int) -> Tuple[pd.DataFrame, float, list[str]]:
+        """Get dataset metadata from IEEG."""
+        ds = self.session.open_dataset(dataset_name)
+       
+        start_time_usec = start_time_usec
+        end_time_usec = end_time_usec
+        duration_usec = end_time_usec - start_time_usec
+
+        channel_labels = ds.get_channel_labels()
+        channel_indices = ds.get_channel_indices(channel_labels)
+        ieeg_clip = ds.get_dataframe(start_time_usec, duration_usec, channel_indices)
+        sampling_rate = ds.get_time_series_details(channel_labels[0]).sample_rate
+        
+        self.session.close_dataset(ds)
+
+        return ieeg_clip, sampling_rate, channel_labels
     
 # %%
 if __name__ == '__main__':
