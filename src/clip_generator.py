@@ -67,7 +67,7 @@ class ClipGenerator(IEEGmetadataValidated):
         """
         annotations_path = clip_path.parent / 'annotations.csv'
         annotations = pd.read_csv(annotations_path)
-        annotations_to_remove = r"(?i)(\*?Tech notation: Video/EEG monitoring taking place|\binterictal\b)"
+        annotations_to_remove = r"(?i)(\*?Tech notation: Video/EEG monitoring taking place|\binterictal\b|x)"
         annotations = annotations[~annotations['description'].str.contains(annotations_to_remove, case=False)]
         
         # Reset clip fields and check overlaps
@@ -76,12 +76,15 @@ class ClipGenerator(IEEGmetadataValidated):
         clip['annotators'] = ''
         clip['layers'] = ''
         clip['close_to_event'] = False
-        clip_clean = self._check_clip_overlaps(clip, annotations)
-        
+        clip_clean = self._check_clip_overlaps(clip, annotations, hours_window=2)
+
         # Apply conditions again
         conditions = ~clip_clean['close_to_event'] & ~clip_clean['is_night']
         is_day_1 = clip_clean['timestamp'].str.contains(r'Day 1\b')
-        return clip_clean[conditions & ~is_day_1]
+
+        clip_clean = clip_clean[conditions & ~is_day_1]
+        
+        return clip_clean
     
     def mark_interictal_clips(self):
         """
@@ -171,24 +174,17 @@ class ClipGenerator(IEEGmetadataValidated):
                     ieeg_dataset.attrs['channels_labels'] = channel_labels
                     ieeg_dataset.attrs['sampling_rate'] = sampling_rate
 
-# %%
+# %% 
 if __name__ == '__main__':
-
-    subjects_to_find = ['sub-RID0089', 'sub-RID0117', 'sub-RID0143', 
-       'sub-RID0167', 'sub-RID0175', 'sub-RID0179', 'sub-RID0193', 
-       'sub-RID0222', 'sub-RID0238', 'sub-RID0267', 'sub-RID0301', 
-       'sub-RID0320', 'sub-RID0322', 'sub-RID0332', 'sub-RID0381', 
-       'sub-RID0405', 'sub-RID0412', 'sub-RID0424', 'sub-RID0508', 
-       'sub-RID0562', 'sub-RID0589', 'sub-RID0595', 'sub-RID0621',
-       'sub-RID0658', 'sub-RID0675', 'sub-RID0679', 'sub-RID0700',
-       'sub-RID0785', 'sub-RID0796', 'sub-RID0852', 'sub-RID0883',
-       'sub-RID0893', 'sub-RID0941', 'sub-RID0967']
+    
+    subjects_to_find = ['sub-RID0190']
 
     
     for subject in subjects_to_find:
         try:
             clip_generator = ClipGenerator(record_id=subject)
             logger.info(f"Processing subject: {subject}")
+            clip_generator.find_interictal_clips()
             interictal_clips = clip_generator.mark_interictal_clips()
         except Exception as e:
             logger.error(f"Error processing {subject}: {str(e)}")

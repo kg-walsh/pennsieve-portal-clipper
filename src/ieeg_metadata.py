@@ -142,11 +142,12 @@ class IEEGmetadata(Redcap):
         # Convert hours to microseconds
         hours_window_usec = int(hours_window * 60 * 60 * 1e6)
         
+        
         # Check for overlaps with annotations
         for idx, clip in clips_df.iterrows():
             clip_start = clip['start_time_usec']
             clip_end = clip['end_time_usec']
-            
+
             # Find overlapping annotations
             overlaps = annotations_df[
                 ((annotations_df['start_time_usec'] >= clip_start) & (annotations_df['start_time_usec'] < clip_end)) |
@@ -212,9 +213,7 @@ class IEEGmetadata(Redcap):
 if __name__ == '__main__':
 
     subjects_to_find = [
-        'sub-RID0222', 'sub-RID0412', 'sub-RID0595', 'sub-RID0621', 'sub-RID0675',
-        'sub-RID0679', 'sub-RID0700', 'sub-RID0785', 'sub-RID0796', 'sub-RID0852',
-        'sub-RID0883', 'sub-RID0893', 'sub-RID0941', 'sub-RID0967'
+        'sub-RID0190'
     ]
 
     ieeg = IEEGmetadata()
