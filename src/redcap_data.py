@@ -92,10 +92,28 @@ class Redcap:
 if __name__ == '__main__':
 
     subjects_to_find = [
-        'sub-RID0222', 'sub-RID0412', 'sub-RID0595', 'sub-RID0621', 'sub-RID0675',
-        'sub-RID0679', 'sub-RID0700', 'sub-RID0785', 'sub-RID0796', 'sub-RID0852',
-        'sub-RID0883', 'sub-RID0893', 'sub-RID0941', 'sub-RID0967'
-    ]
+        "sub-RID0037",
+        "sub-RID0102",
+        "sub-RID0213",
+        "sub-RID0309",
+        "sub-RID0420",
+        "sub-RID0459",
+        "sub-RID0502",
+        "sub-RID0529",
+        "sub-RID0534",
+        "sub-RID0536",
+        "sub-RID0583",
+        "sub-RID0646",
+        "sub-RID0652",
+        "sub-RID0786",
+        "sub-RID0825",
+        "sub-RID0839",
+        "sub-RID0490",
+        "sub-RID0572",
+        "sub-RID0648",
+        "sub-RID0194",
+        "sub-RID0476",
+        "sub-RID0596" ]
     
     redcap = Redcap()  # Initialize the Redcap client
 

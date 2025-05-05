@@ -185,25 +185,17 @@ class IEEGmetadataValidated(IEEGmetadata, ManualValidation):
 
 # %%
 if __name__ == '__main__':
-
-    # subjects_to_find = ['sub-RID0031', 'sub-RID0032', 'sub-RID0033', 'sub-RID0050',
-    #    'sub-RID0051', 'sub-RID0064', 'sub-RID0089', 'sub-RID0101',
-    #    'sub-RID0117', 'sub-RID0143', 'sub-RID0167', 'sub-RID0175',
-    #    'sub-RID0179', 'sub-RID0193', 'sub-RID0222', 'sub-RID0238',
-    #    'sub-RID0267', 'sub-RID0301', 'sub-RID0320', 'sub-RID0322',
-    #    'sub-RID0332', 'sub-RID0381', 'sub-RID0405', 'sub-RID0412',
-    #    'sub-RID0424', 'sub-RID0508', 'sub-RID0562', 'sub-RID0589',
-    #    'sub-RID0595', 'sub-RID0621', 'sub-RID0658', 'sub-RID0675',
-    #    'sub-RID0679', 'sub-RID0700', 'sub-RID0785', 'sub-RID0796',
-    #    'sub-RID0852', 'sub-RID0883', 'sub-RID0893', 'sub-RID0941',
-    #    'sub-RID0967']
-
-    subjects_to_find = ['sub-RID0190']
+    
+    subjects_to_find = ["sub-RID0572"]
     
     ieeg = IEEGmetadataValidated()
     
     for subject in subjects_to_find:
-        ieeg.process_subject_data(subject)
+        print(f'Processing {subject}')
+        try:
+            ieeg.process_subject_data(subject)
+        except Exception as e:
+            print(f'Error processing {subject}: {e}')
 
 # %%
 

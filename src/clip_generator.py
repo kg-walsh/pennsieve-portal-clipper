@@ -68,7 +68,7 @@ class ClipGenerator(IEEGmetadataValidated):
         annotations_path = clip_path.parent / 'annotations.csv'
         annotations = pd.read_csv(annotations_path)
         annotations_to_remove = r"(?i)(\*?Tech notation: Video/EEG monitoring taking place|\binterictal\b|x)"
-        annotations = annotations[~annotations['description'].str.contains(annotations_to_remove, case=False)]
+        annotations = annotations[~annotations['description'].str.contains(annotations_to_remove, case=False, na=False)]
         
         # Reset clip fields and check overlaps
         clip['has_events'] = False
@@ -177,8 +177,10 @@ class ClipGenerator(IEEGmetadataValidated):
 # %% 
 if __name__ == '__main__':
     
-    subjects_to_find = ['sub-RID0190']
-
+    subjects_to_find = ['sub-RID0839',
+            'sub-RID0786',
+            'sub-RID0646',
+            'sub-RID0825','sub-RID0596']
     
     for subject in subjects_to_find:
         try:
