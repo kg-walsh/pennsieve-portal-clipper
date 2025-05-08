@@ -105,7 +105,7 @@ class ClipGenerator(IEEGmetadataValidated):
             interictal_clips[['day_label', 'day_num', 'time']] = interictal_clips['timestamp'].str.split(expand=True)
             
             # Convert time to datetime, keeping track of day number separately
-            interictal_clips['time'] = pd.to_datetime(interictal_clips['time'])
+            interictal_clips['time'] = pd.to_datetime(interictal_clips['time'], format='%H:%M:%S')
             interictal_clips['day_num'] = interictal_clips['day_num'].astype(int)
             
             # Group by day_num instead of day
