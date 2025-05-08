@@ -71,17 +71,29 @@ class ManualValidation(Redcap):
 
 if __name__ == '__main__':
 
-    subjects_to_find = ['sub-RID0031', 'sub-RID0032', 'sub-RID0033', 'sub-RID0050',
-       'sub-RID0051', 'sub-RID0064', 'sub-RID0089', 'sub-RID0101',
-       'sub-RID0117', 'sub-RID0143', 'sub-RID0167', 'sub-RID0175',
-       'sub-RID0179', 'sub-RID0193', 'sub-RID0222', 'sub-RID0238',
-       'sub-RID0267', 'sub-RID0301', 'sub-RID0320', 'sub-RID0322',
-       'sub-RID0332', 'sub-RID0381', 'sub-RID0405', 'sub-RID0412',
-       'sub-RID0424', 'sub-RID0508', 'sub-RID0562', 'sub-RID0589',
-       'sub-RID0595', 'sub-RID0621', 'sub-RID0658', 'sub-RID0675',
-       'sub-RID0679', 'sub-RID0700', 'sub-RID0785', 'sub-RID0796',
-       'sub-RID0852', 'sub-RID0883', 'sub-RID0893', 'sub-RID0941',
-       'sub-RID0967']
+    subjects_to_find = [
+        "sub-RID0037",
+        "sub-RID0102",
+        "sub-RID0213",
+        "sub-RID0309",
+        "sub-RID0420",
+        "sub-RID0459",
+        "sub-RID0502",
+        "sub-RID0529",
+        "sub-RID0534",
+        "sub-RID0536",
+        "sub-RID0583",
+        "sub-RID0646",
+        "sub-RID0652",
+        "sub-RID0786",
+        "sub-RID0825",
+        "sub-RID0839",
+        "sub-RID0490",
+        "sub-RID0572",
+        "sub-RID0648",
+        "sub-RID0194",
+        "sub-RID0476",
+        "sub-RID0596" ]
 
     validated_data = ManualValidation()
     ieegportal_data_df = validated_data.get_redcap_data(subjects=subjects_to_find)

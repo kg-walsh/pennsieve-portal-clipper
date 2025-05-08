@@ -213,8 +213,28 @@ class IEEGmetadata(Redcap):
 if __name__ == '__main__':
 
     subjects_to_find = [
-        'sub-RID0190'
-    ]
+        "sub-RID0037",
+        "sub-RID0102",
+        "sub-RID0213",
+        "sub-RID0309",
+        "sub-RID0420",
+        "sub-RID0459",
+        "sub-RID0502",
+        "sub-RID0529",
+        # "sub-RID0534",
+        "sub-RID0536",
+        "sub-RID0583",
+        "sub-RID0646",
+        "sub-RID0652",
+        # "sub-RID0786",
+        # "sub-RID0825",
+        # "sub-RID0839",
+        "sub-RID0490",
+        "sub-RID0572",
+        "sub-RID0648",
+        "sub-RID0194",
+        "sub-RID0476",
+        "sub-RID0596" ]
 
     ieeg = IEEGmetadata()
     ieeg_data_df = ieeg.get_redcap_data(subjects=subjects_to_find)
