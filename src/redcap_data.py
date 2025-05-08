@@ -2,7 +2,7 @@
 import pandas as pd
 import requests
 from io import StringIO
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 import os
 
 # %%
@@ -18,6 +18,8 @@ class Redcap:
             token (str, optional): REDCap API token. If None, loads from environment variables.
             report_id (str, optional): REDCap report ID. If None, loads from environment variables.
         """
+        env_path = find_dotenv()
+        print(f"Found .env file at: {env_path}")
         load_dotenv()
         self.token = token if token else os.getenv('REDCAP_TOKEN')
         self.report_id = report_id if report_id else os.getenv('REDCAP_REPORT_ID')
@@ -75,8 +77,12 @@ class Redcap:
             'exportCheckboxLabel': 'false',
             'returnFormat': 'csv'
         }
-            
+
+        print('Fetching data from REDCap...')
         response = requests.post(self.redcap_url, data=data)
+        print('HTTP Status: ' + str(response.status_code))
+        if response.status_code == 200:
+            print('Data fetched successfully.')
         df = pd.read_csv(StringIO(response.text))
         df['record_id'] = 'sub-RID' + df['record_id'].astype(str).str.zfill(4)
         df = df.set_index('record_id').sort_index()
@@ -91,15 +97,12 @@ class Redcap:
 
 if __name__ == '__main__':
 
-    subjects_to_find = [
-        'sub-RID0222', 'sub-RID0412', 'sub-RID0595', 'sub-RID0621', 'sub-RID0675',
-        'sub-RID0679', 'sub-RID0700', 'sub-RID0785', 'sub-RID0796', 'sub-RID0852',
-        'sub-RID0883', 'sub-RID0893', 'sub-RID0941', 'sub-RID0967'
-    ]
-    
-    redcap = Redcap()  # Initialize the Redcap client
+    subjects_to_find = ['sub-RID0015', 'sub-RID0030', 'sub-RID0063', 'sub-RID0066', 'sub-RID0595',]
 
+    redcap = Redcap()  # Initialize the Redcap client
     df_redcap = redcap.get_redcap_data(subjects=subjects_to_find)  # Get the data
-    df_ieegportal = redcap.expand_ieeg_days_rows(df_redcap)  # Expand IEEG rows
+    print(df_redcap)
+    f_ieegportal = redcap.expand_ieeg_days_rows(df_redcap) # Expand IEEG rows
+    #print(f_ieegportal)
 
 # %%
