@@ -28,7 +28,7 @@ class IEEGmetadataValidated(ManualValidation, ClipGenerator):
 
         # get data environment
         self.data_path = Path(os.getenv('RAW_DATA_DIR'))
-        self.output_path = Path(__file__).parent.parent / 'data' #Path(os.getenv('OUTPUT_DIR'))
+        self.output_path = Path(os.getenv('OUTPUT_DIR'))
 
     # Main entry point
     def process_subject_data(self, subject_id: str) -> None:
@@ -94,7 +94,8 @@ class IEEGmetadataValidated(ManualValidation, ClipGenerator):
             'type': ['seizure'] * len(seizure_times),
             # Convert seconds to microseconds (1e6)
             'start_time_usec': (seizure_times['start'] * 1e6).astype(int).tolist(),
-            'end_time_usec': (seizure_times['end'] * 1e6).astype(int).tolist()
+            'end_time_usec': (seizure_times['end'] * 1e6).astype(int).tolist(),
+            'file_num': seizure_times['file'].astype(int).tolist()
         }
         
         # Convert to DataFrame and sort by start time
@@ -134,12 +135,14 @@ class IEEGmetadataValidated(ManualValidation, ClipGenerator):
         seizure_annotations = self.process_seizure_annotations(seizure_times_df)
         
         # Create session output directory
-        session_output_dir = Path(self.output_path) / record_id / session
+        session_output_dir = Path(self.output_path) / record_id / session 
         session_output_dir.mkdir(parents=True, exist_ok=True)
         
         # init containers for consolidated data
         edf_annotations = []
         all_clips = []
+        all_channels = []
+        all_metadata = []
         first_edf_channels = None
         channels_consistent = True
         
@@ -147,9 +150,12 @@ class IEEGmetadataValidated(ManualValidation, ClipGenerator):
         session_metadata = {
             'record_id': record_id,
             'session': session,
-            'edf_files': []
+            'edf_files': [],
+            'total_duration_hours': 0,
+            'total_seizures': 0,
+            'total_clips': 0
         }
-        
+
         # Process each EDF file
         for idx, row in edf_df.iterrows():
             edf_path = Path(row['edf_path'])
@@ -163,9 +169,11 @@ class IEEGmetadataValidated(ManualValidation, ClipGenerator):
             
             print(f'Processing {edf_file} (File #{file_number})')
 
+            print(seizure_annotations)
+
             # filter for seizures in this file
-            #edf_seizures_annotations = seizure_annotations[int(seizure_annotations['Day']) == file_number]
-            edf_seizures_annotations = seizure_annotations
+            edf_seizures_annotations = seizure_annotations[seizure_annotations['file_num'] == file_number]
+            #edf_seizures_annotations = seizure_annotations
             print(edf_seizures_annotations)
 
             # Get metadata and data for this EDF
@@ -176,6 +184,7 @@ class IEEGmetadataValidated(ManualValidation, ClipGenerator):
             [annotations_df, edf_seizures_annotations], 
             ignore_index=True
             )
+            annotations_df_validated['file_num'] = file_number
 
             clips_df = self._ieeg_clips(annotations_df_validated, metadata_dict)
             clips_df['file_num'] = file_number
@@ -193,81 +202,80 @@ class IEEGmetadataValidated(ManualValidation, ClipGenerator):
 
             print('metadata saved')
 
-            clips_df = self.get_dataset_clips(record_id, edf_path, run_dir, clips_df, raw_edf)
+            self.get_dataset_clips(record_id, edf_path, run_dir, clips_df, raw_edf)
 
-            # Add file_number to EDF annotations
-            #annotations_df['file_number'] = file_number
+            # Collect data for session-level summaries
+            edf_annotations.append(annotations_df_validated)
+            all_clips.append(clips_df)
+            all_channels.append(channels_df)
             
-        #     # Filter seizure annotations for this file if "Day" column exists
-        #     file_seizure_annotations = None
-        #     if seizure_times_df is not None and not seizure_times_df.empty and 'Day' in seizure_times_df.columns:
-        #         # Filter seizures for this specific day/file
-        #         file_seizures = seizure_times_df[seizure_times_df['Day'] == file_number]
-        #         if not file_seizures.empty:
-        #             # Process these file-specific seizures
-        #             file_seizure_annotations = self.process_seizure_annotations(file_seizures)
-        #             file_seizure_annotations['file_number'] = file_number
-        #             print(f"  Added {len(file_seizure_annotations)} seizures for file #{file_number}")
-                    
-        #             # Combine with EDF annotations
-        #             annotations_df = pd.concat([annotations_df, file_seizure_annotations], ignore_index=True)
+            # Update session metadata
+            session_metadata['edf_files'].append({
+                'file_number': file_number,
+                'filename': edf_file,
+                'duration_hours': np.round(metadata_dict['duration_sec'] / 3600, 2),
+                'num_channels': len(channels_df),
+                'num_annotations': len(annotations_df_validated),
+                'num_clips': len(clips_df)
+            })
             
-        #     # Process clips based on combined annotations
-        #     clips_df = self._ieeg_clips(annotations_df, metadata_dict)
-        #     clips_df['file_number'] = file_number
+            session_metadata['total_duration_hours'] += np.round(metadata_dict['duration_sec'] / 3600, 2)
+            session_metadata['total_seizures'] += len(edf_seizures_annotations)
+            session_metadata['total_clips'] += len(clips_df)
             
-        #     # Add timestamp information carefully
-        #     try:
-        #         if 'actual_start_time' in metadata_dict and metadata_dict['actual_start_time'] is not None:
-        #             clips_df = self.timestamp_clips(clips_df, metadata_dict)
-        #     except Exception as e:
-        #         print(f"Warning: Error in timestamp_clips: {e}")
+            # Check channel consistency
+            if first_edf_channels is None:
+                first_edf_channels = set(channels_df['label'])
+            else:
+                current_channels = set(channels_df['label'])
+                if current_channels != first_edf_channels:
+                    channels_consistent = False
+        
+        # Save session-level consolidated files
+        if all_clips:
+            # Consolidated clips across all runs
+            session_clips_df = pd.concat(all_clips, ignore_index=True)
+            session_clips_path = session_output_dir / "session_clips_summary.csv"
+            session_clips_df.to_csv(session_clips_path, index=False)
             
-        #     # Add to EDF-specific annotations and clips
-        #     edf_annotations.append(annotations_df)
-        #     all_clips.append(clips_df)
+            # Consolidated annotations across all runs
+            session_annotations_df = pd.concat(edf_annotations, ignore_index=True)
+            session_annotations_path = session_output_dir / "session_annotations_summary.csv"
+            session_annotations_df.to_csv(session_annotations_path, index=False)
             
-        #     # Add to session metadata
-        #     session_metadata['edf_files'].append({
-        #         'file_number': file_number,
-        #         'edf_file': edf_file,
-        #         'start_time_usec': metadata_dict['start_time_usec'],
-        #         'end_time_usec': metadata_dict['end_time_usec'],
-        #         'duration_sec': metadata_dict['duration_sec'],
-        #         'sampling_rate': metadata_dict['sampling_rate']
-        #     })
-                
-
-        # # Create consolidated files
-        # if edf_annotations:
-        #     # Add channels consistency to metadata
-        #     session_metadata['channels_consistent'] = channels_consistent
+            # Channel consistency report
+            session_channels_df = pd.concat(all_channels, ignore_index=True)
+            session_channels_path = session_output_dir / "session_channels_summary.csv"
+            session_channels_df.to_csv(session_channels_path, index=False)
             
-        #     # Concatenate EDF annotations
-        #     consolidated_edf_annotations = pd.concat(edf_annotations, ignore_index=True)
+            # Session metadata and statistics
+            session_metadata['channels_consistent'] = channels_consistent
+            session_metadata['unique_channels'] = sorted(list(first_edf_channels)) if first_edf_channels else []
+            session_metadata['processing_timestamp'] = pd.Timestamp.now().isoformat()
             
-        #     # Combine EDF annotations with seizure annotations (if any)
-        #     if seizure_annotations is not None and not seizure_annotations.empty:
-        #         consolidated_annotations = pd.concat([consolidated_edf_annotations, seizure_annotations], ignore_index=True)
-        #     else:
-        #         consolidated_annotations = consolidated_edf_annotations
+            # Save as JSON
+            session_metadata_path = session_output_dir / "session_metadata.json"
+            with open(session_metadata_path, 'w') as f:
+                json.dump(session_metadata, f, indent=2)
             
-        #     # Concatenate all clips
-        #     consolidated_clips = pd.concat(all_clips, ignore_index=True)
+            # Create session statistics summary
+            session_stats = {
+                'record_id': record_id,
+                'session': session,
+                'total_files': len(edf_df),
+                'total_duration_hours': session_metadata['total_duration_hours'],
+                'total_seizures': session_metadata['total_seizures'],
+                #'total_1s_clips': session_metadata['total_clips'],
+                'channels_consistent': channels_consistent,
+                'num_channels': len(first_edf_channels) if first_edf_channels else 0,
+            }
             
-        #     # Save consolidated data
-        #     consolidated_annotations.to_csv(session_output_dir / 'all_annotations.csv', index=False)
-        #     consolidated_clips.to_csv(session_output_dir / 'all_clips.csv', index=False)
-        #     if first_edf_channels is not None:
-        #         first_edf_channels.to_csv(session_output_dir / 'all_channels.csv', index=False)
+            session_stats_df = pd.DataFrame([session_stats])
+            session_stats_path = session_output_dir / "session_statistics.csv"
+            session_stats_df.to_csv(session_stats_path, index=False)
             
-        #     # Save session metadata
-        #     with open(session_output_dir / 'session_metadata.json', 'w') as f:
-        #         json.dump(session_metadata, f, indent=4)
-            
-        #     print(f"Session processing complete. Consolidated {len(edf_annotations)} EDF files.")
-        # else:
-        #     print("No data processed for this session.")
+            print(f"Session-level metadata saved to {session_output_dir}")
+            print(f"Channels consistent across files: {channels_consistent}")
 
     def _extract_day_or_run(self, filename):
         """Extract day or run number from filename"""
@@ -487,7 +495,9 @@ class IEEGmetadataValidated(ManualValidation, ClipGenerator):
         """Get dataset metadata from an EDF file using MNE."""
         
         # Load the EDF file
-        raw = mne.io.read_raw_edf(edf_path, preload=True)
+        raw = mne.io.read_raw_edf(edf_path, preload=False)
+
+        filename = Path(edf_path).name
         
         # Get channel information
         channel_labels = raw.ch_names
@@ -500,6 +510,8 @@ class IEEGmetadataValidated(ManualValidation, ClipGenerator):
         file_start_time_usec = 0  # EDF files typically start at 0
         file_duration_sec = raw.times[-1]  # Duration in seconds
         file_end_time_usec = int(file_duration_sec * 1e6)  # Convert to microseconds
+
+        file_num = self._extract_day_or_run(filename)
         
         # Create channels DataFrame
         channels_df = pd.DataFrame({
@@ -517,11 +529,12 @@ class IEEGmetadataValidated(ManualValidation, ClipGenerator):
             'description': [],
             'type': [],
             'start_time_usec': [],
-            'end_time_usec': []
+            'end_time_usec': [],
         }
         
         # Process annotations
         for i, annot in enumerate(annotations):
+            print('processing annotations')
             # Convert MNE annotations to the same format as IEEG
             onset_sec = annot['onset']
             duration = annot['duration']
@@ -550,16 +563,16 @@ class IEEGmetadataValidated(ManualValidation, ClipGenerator):
             'end_time_usec': file_end_time_usec,
             'duration_sec': file_duration_sec,
             'edf_path': edf_path,
-            'file_name': Path(edf_path).name
+            'file_name': Path(edf_path).name,
+            'file_num' : file_num
         }
 
         return channels_df, annotations_df, metadata_dict, raw
 
     def get_dataset_clips(self, record_id, edf_path, output_dir, clips_df, raw_edf):
         clip_generator = ClipGenerator(record_id=subject)
-        print('init of clip generator')
-        clip_generator.find_interictal_clips(output_dir)
-        interictal_clips = clip_generator.mark_interictal_clips(output_dir, raw_edf)
+        clip_generator.mark_interictal_clips(output_dir, raw_edf)
+        clip_generator.mark_ictal_clips(output_dir, raw_edf)
     
     def _ieeg_clips(self, annotations_df: pd.DataFrame, metadata_dict: Dict) -> pd.DataFrame:
         """Create a DataFrame of 1-minute clips with annotation information.
@@ -600,51 +613,50 @@ class IEEGmetadataValidated(ManualValidation, ClipGenerator):
         
         return clips_df
     
-    def _check_clip_overlaps(self, clips_df: pd.DataFrame, annotations_df: pd.DataFrame, 
-                            hours_window: float = 2.0) -> pd.DataFrame:
-        """Check for overlaps between clips and annotations.
+    # def _check_clip_overlaps(self, clips_df: pd.DataFrame, annotations_df: pd.DataFrame, 
+    #                         hours_window: float = 2.0) -> pd.DataFrame:
+    #     """Check for overlaps between clips and annotations.
         
-        Args:
-            clips_df (pd.DataFrame): DataFrame containing clip information
-            annotations_df (pd.DataFrame): DataFrame containing annotations
-            hours_window (float): Hours before and after an event to mark as close. Defaults to 2.0
+    #     Args:
+    #         clips_df (pd.DataFrame): DataFrame containing clip information
+    #         annotations_df (pd.DataFrame): DataFrame containing annotations
+    #         hours_window (float): Hours before and after an event to mark as close. Defaults to 2.0
         
-        Returns:
-            pd.DataFrame: Updated clips DataFrame with overlap information
-        """
-        # Convert hours to microseconds
-        hours_window_usec = int(hours_window * 60 * 60 * 1e6)
+    #     Returns:
+    #         pd.DataFrame: Updated clips DataFrame with overlap information
+    #     """
+    #     # Convert hours to microseconds
+    #     hours_window_usec = int(hours_window * 60 * 60 * 1e6)
         
-        # Check for overlaps with annotations
-        for idx, clip in clips_df.iterrows():
-            clip_start = clip['start_time_usec']
-            clip_end = clip['end_time_usec']
+    #     # Check for overlaps with annotations
+    #     for idx, clip in clips_df.iterrows():
+    #         clip_start = clip['start_time_usec']
+    #         clip_end = clip['end_time_usec']
 
-            # Find overlapping annotations
-            overlaps = annotations_df[
-                ((annotations_df['start_time_usec'] >= clip_start) & (annotations_df['start_time_usec'] < clip_end)) |
-                ((annotations_df['end_time_usec'] > clip_start) & (annotations_df['end_time_usec'] <= clip_end)) |
-                ((annotations_df['start_time_usec'] <= clip_start) & (annotations_df['end_time_usec'] >= clip_end))
-            ]
+    #         # Find overlapping annotations
+    #         overlaps = annotations_df[
+    #             ((annotations_df['start_time_usec'] >= clip_start) & (annotations_df['start_time_usec'] < clip_end)) |
+    #             ((annotations_df['end_time_usec'] > clip_start) & (annotations_df['end_time_usec'] <= clip_end)) |
+    #             ((annotations_df['start_time_usec'] <= clip_start) & (annotations_df['end_time_usec'] >= clip_end))
+    #         ]
             
-            if not overlaps.empty:
-                clips_df.at[idx, 'has_events'] = True
-                # Convert to strings before joining
-                clips_df.at[idx, 'events'] = ', '.join(str(x) for x in overlaps['description'].unique())
-                clips_df.at[idx, 'annotators'] = ', '.join(str(x) for x in overlaps['annotator'].unique())
-                clips_df.at[idx, 'layers'] = ', '.join(str(x) for x in overlaps['layer'].unique())
+    #         if not overlaps.empty:
+    #             clips_df.at[idx, 'has_events'] = True
+    #             # Convert to strings before joining
+    #             clips_df.at[idx, 'events'] = ', '.join(str(x) for x in overlaps['description'].unique())
+    #             clips_df.at[idx, 'annotators'] = ', '.join(str(x) for x in overlaps['annotator'].unique())
+    #             clips_df.at[idx, 'layers'] = ', '.join(str(x) for x in overlaps['layer'].unique())
                 
-                # Mark clips within specified hours of this event as being close to an event
-                nearby_clips = (
-                    (clips_df['start_time_usec'] >= clip_start - hours_window_usec) &
-                    (clips_df['end_time_usec'] <= clip_end + hours_window_usec)
-                )
-                clips_df.loc[nearby_clips, 'close_to_event'] = True
+    #             # Mark clips within specified hours of this event as being close to an event
+    #             nearby_clips = (
+    #                 (clips_df['start_time_usec'] >= clip_start - hours_window_usec) &
+    #                 (clips_df['end_time_usec'] <= clip_end + hours_window_usec)
+    #             )
+    #             clips_df.loc[nearby_clips, 'close_to_event'] = True
         
-        return clips_df
+    #     return clips_df
 
-    def save_metadata(self, record_id, session, run_name, channels_df, annotations_df, metadata_dict, clips_df, 
-                    path_to_save: Path = Path(__file__).parent.parent / 'data'):
+    def save_metadata(self, record_id, session, run_name, channels_df, annotations_df, metadata_dict, clips_df, path_to_save: Path = Path(__file__).parent.parent / 'data'):
         """Save the metadata to a file.
             
         Args:
@@ -657,8 +669,9 @@ class IEEGmetadataValidated(ManualValidation, ClipGenerator):
             clips_df: DataFrame containing clip information
             path_to_save: Path where metadata will be saved. Defaults to 'data'
         """
+        path_to_save = self.output_path
         print(path_to_save)
-        output_filepath = Path(path_to_save / record_id / session / run_name)
+        output_filepath = Path(path_to_save / record_id / session  / run_name)
         print(f"Saving metadata to {output_filepath}")
         output_filepath.mkdir(parents=True, exist_ok=True)
         
@@ -672,21 +685,37 @@ class IEEGmetadataValidated(ManualValidation, ClipGenerator):
                 f.write(f"{key}: {value}\n")
             
         return output_filepath 
-
+    
 # %%
+import gc
+import psutil
+
 if __name__ == '__main__':
     
-    #subjects_to_find = ["sub-RID0572"]
-    subjects_to_find = ["sub-PENN019"]
-    
+    subjects_to_find = ['sub-PENN017','sub-PENN018', 'sub-PENN019', 'sub-PENN021', 'sub-PENN023', 'sub-PENN024', 
+                       'sub-PENN025', 'sub-PENN026', 'sub-PENN013']
+    subjects_to_find = ['sub-PENN002']
     ieeg = IEEGmetadataValidated()
+    
+    def print_memory_usage(stage):
+        process = psutil.Process()
+        memory_mb = process.memory_info().rss / 1024 / 1024
+        print(f"{stage}: {memory_mb:.2f} MB")
     
     for subject in subjects_to_find:
         print(f'Processing {subject}')
+        print_memory_usage(f"Starting {subject}")
+        
         try:
             ieeg.process_subject_data(subject)
+            print_memory_usage(f"After processing {subject}")
         except Exception as e:
             print(f'Error processing {subject}: {e}')
+        
+        # Force garbage collection
+        gc.collect()
+        print_memory_usage(f"After GC {subject}")
+        print("-" * 50)
 
 # %%
 

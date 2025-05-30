@@ -52,6 +52,7 @@ class ManualValidation(Redcap):
         """ Map HUP IDs to R61 IDs."""
         ids = pd.read_csv(self.identifiers)
         id_map = dict(zip(ids['HUP_ID'], ids['R61_ID']))
+        
         seizure_times['Patient'] = seizure_times['Patient'].map(id_map)
 
         return seizure_times
@@ -68,13 +69,8 @@ class ManualValidation(Redcap):
         #sheet_name = os.getenv('SHEET_NAME_MANUAL_VALIDATION_SEIZURE_TIME')
         #seizure_times_url = f"{self.manualvalidation_url}gviz/tq?tqx=out:csv&sheet={sheet_name}"
         seizure_times = pd.read_csv(self.manual_validation_csv)
-        print(seizure_times)
-
-        seizure_times = self.get_hup_id(seizure_times)
-        print(seizure_times)
+        #seizure_times = self.get_hup_id(seizure_times)
         seizure_times = seizure_times[seizure_times['Patient'].isin(record_id)]
-        print(seizure_times)
-
 
         return seizure_times
     
@@ -84,7 +80,7 @@ class ManualValidation(Redcap):
 if __name__ == '__main__':
 
     subjects_to_find = [
-        "sub-PENN001"]
+        "sub-PENN002"]
 
     validated_data = ManualValidation()
     #ieegportal_data_df = validated_data.get_redcap_data(subjects=subjects_to_find)
